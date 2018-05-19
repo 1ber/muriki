@@ -1,4 +1,20 @@
 #!/usr/bin/env python
+# =====================================================================
+# Copyright 2018 Humberto Ramos Costa. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or 
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# =====================================================================
 import re
 from gettext import gettext as _
 from aenum import Enum, skip
@@ -74,7 +90,6 @@ WhiteSpaceBehaviour = Enum('WhiteSpaceBehaviour', 'PRESERVE REPLACE COLLAPSE')
 class DataProperty(object):
     def __init__(self, *args, **kwargs):
         for k, v in kwargs.items():
-            #~ print( k, v )
             if (v is not None):
                 setattr(self, k, v)
 
@@ -92,7 +107,6 @@ class DataProperty(object):
                     self.fget = self.auto_get
                     self.fset = self.auto_set
                     self.fdel = self.auto_del
-                    #~ print( 'place_holder' )
                 except AttributeError:
                     ValueError(
                         _("Neither fget, fset or "
@@ -100,7 +114,6 @@ class DataProperty(object):
                     )
 
     def auto_get(self, obj):
-        #~ print( str( self._name ) )
         tmp = getattr(obj, '_' + self._name, None)
         if(tmp is None):
             tmp = getattr(self, 'default_value', None)
@@ -285,7 +298,6 @@ class DataProperty(object):
                         + '.'
                         + value[self.fl_length - self.fraction_digits:]
                     )
-                    # print ( tmp )
                     return decimal.Decimal(tmp)
             # There is no specific convertion rules, so it just pass
             except AttributeError:

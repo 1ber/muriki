@@ -1,11 +1,39 @@
 #!/usr/bin/env python
+# =====================================================================
+# Copyright 2018 Humberto Ramos Costa. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or 
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# =====================================================================
+
 import csv
 import re
+import decimal
+import traceback
+
 from decimal import *
 from gettext import gettext as _
+from aenum import Enum, skip
+from datetime import *
+from muriki.DataProperty import *
+#~ import ( DataProperty, generate_error_message, data_property
+                            #~ , auto_data_property, Sql)
+
+
 #import psycopg2 // will be needed if postgre database is used
 
-from .DataProperty import *
+#from .DataProperty import *
+
 """
 This utilty is intended to use to ease the import of data from files and
 the persisntence into databases. Options are made to make those
@@ -47,23 +75,21 @@ def data_entity(
 
     @classmethod
     def create_table(cls):
-    """
-    Simply use the execute_sql function to create int the database
-    that correspond to the class
-        :param cls: The class passed by the decorator
-    """
+        """
+        Simply use the execute_sql function to create int the database
+        that correspond to the class
+            :param cls: The class passed by the decorator
+        """
         cls.execute_sql(cls.create_table_sql())
 
-"""
-    """
     
     @classmethod
     def execute_sql(cls, sql=None, values=None, commit=True):
-    """
-    Execute arbitrary sql code, the code is generated in other functions
-    based on the sqlEngine parameter
-        :param cls: The class passed by the decorator
-    """
+        """
+        Execute arbitrary sql code, the code is generated in other functions
+        based on the sqlEngine parameter
+            :param cls: The class passed by the decorator
+        """
         try:
             result = cls._cursor.execute(sql, values)
         except Exception as e:
@@ -78,13 +104,13 @@ def data_entity(
 
     @classmethod
     def sql_columns(cls):
-    """
-    search the properties decorated, get those with sql_column_type
-    defined and put in the correspondent list. The separation is
-    needed to create the columns in a certain order (keys, indexes
-    ,data) to improve performance
-        :param cls: The class passed by the decorator
-    """
+        """
+        search the properties decorated, get those with sql_column_type
+        defined and put in the correspondent list. The separation is
+        needed to create the columns in a certain order (keys, indexes
+        ,data) to improve performance
+            :param cls: The class passed by the decorator
+        """
         columns = {
             Sql.ColumnType.AUTO_INCREMENT: [],
             Sql.ColumnType.PRIMARY_KEY: [],
@@ -102,27 +128,28 @@ def data_entity(
 
     @classmethod
     def fl_properties(cls):
-    """
-    search the properties decorated, get those with fl_start
-    member defined, order by this member and return the list.
-    The order is important in a fixed length import
-        :param cls: The class passed by the decorator
-    """
+        """
+        search the properties decorated, get those with fl_start
+        member defined, order by this member and return the list.
+        The order is important in a fixed length import
+            :param cls: The class passed by the decorator
+        """
         flp = [p for p in vars(cls).values()
                if ((p is not None) and isinstance(p, DataProperty)
                    and not(p.fl_start is None))
                ]
         flp.sort(key=lambda f: f.fl_start)
+        return flp
 
 
     @classmethod
     def csv_properties(cls):
-    """
-    search the properties decorated, get those with csv_position
-    member defined, order by this member and return the list.
-    The order is important in a fixed length import
-        :param cls: The class passed by the decorator
-    """
+        """
+        search the properties decorated, get those with csv_position
+        member defined, order by this member and return the list.
+        The order is important in a fixed length import
+            :param cls: The class passed by the decorator
+        """
 
         csvp = [p for p in vars(cls).values()
                if ((p is not None) and isinstance(p, DataProperty)
@@ -134,11 +161,11 @@ def data_entity(
 
     @classmethod
     def create_table_sql(cls):
-    """
-    Generates the string (based on the properties passed to the
-    decorator) used to create the corresponding table 
-        :param cls: The class passed by the decorator
-    """
+        """
+        Generates the string (based on the properties passed to the
+        decorator) used to create the corresponding table 
+            :param cls: The class passed by the decorator
+        """
 
         tmp = cls._database_engine.create_table.value + \
             ' ' + (cls.__name__.lower() + ' ( ')
@@ -177,13 +204,13 @@ def data_entity(
 
     @classmethod
     def insert_sql(cls):
-    """
-    Generates the string (based on the properties passed to the
-    decorator) used to create one register on the database, this
-    register will 'fit' in a database created by create_table_sql
-    function
-        :param cls: The class passed by the decorator
-    """
+        """
+        Generates the string (based on the properties passed to the
+        decorator) used to create one register on the database, this
+        register will 'fit' in a database created by create_table_sql
+        function
+            :param cls: The class passed by the decorator
+        """
         names = []
         auto_increment_field_name = ''
         for k, sql_columns_by_type in cls.sql_columns().items():
@@ -206,12 +233,12 @@ def data_entity(
 
     @classmethod
     def batch_insert(cls, instances=[]):
-    """
-    Creates a 'huge' string to insert a lot of registers in just one
-    execution.
-        :param cls: The class passed by the decorator
-        :para instances: a list of the objects to be persisted
-    """
+        """
+        Creates a 'huge' string to insert a lot of registers in just one
+        execution.
+            :param cls: The class passed by the decorator
+            :para instances: a list of the objects to be persisted
+        """
         
         batch_sql = ''
         for instance in instances:
@@ -227,15 +254,15 @@ def data_entity(
             headers=False,
             delimiter='\t',
             quotechar=None):
-    """
-    Creates a list of instances of objects from the defined entity from an csv file
-        :param cls: The class passed by the decorator
-        :param file_name: The name of the file (csv formatted)
-        :param headers: Wheter the file has a first row with column names
-        :param delimiter: The delimiter of the fields in the csv file
-        :param quotechar: The char used to 'enclose' the values, it's 
-            needed to allow the delimiter to occur inside the fields
-    """
+        """
+        Creates a list of instances of objects from the defined entity from an csv file
+            :param cls: The class passed by the decorator
+            :param file_name: The name of the file (csv formatted)
+            :param headers: Wheter the file has a first row with column names
+            :param delimiter: The delimiter of the fields in the csv file
+            :param quotechar: The char used to 'enclose' the values, it's 
+                needed to allow the delimiter to occur inside the fields
+        """
         #~ with (open( file_name ) as csv_file:
             #~ csv_reader = csv.DictReader( fieldnames= )
         entities = []
@@ -245,39 +272,33 @@ def data_entity(
             entity = cls()
             entity.properties_from_csv( row )
             entities.append( entity )
-            #~ print(str(row))
         return ( entities )
 
     def properties_from_csv(self, values=None):
-    """
-    Set the values of properties of an object (self) with a list of
-        :param cls: The class passed by the decorator
-        :param values: The list of values to be setted in the properties
-    """
+        """
+        Set the values of properties of an object (self) with a list of
+            :param cls: The class passed by the decorator
+            :param values: The list of values to be setted in the properties
+        """
         
         for p in self.__class__.csv_properties():
-            # print( str( type ( p.fl_start )))
-            #~ tmp = string[p.fl_start: (p.fl_start + p.fl_length)].strip()
             setattr(self, p._name, values[ p.csv_position] )
             
     @classmethod
     def create_from_fl(cls, file_name=None, encoding="utf-8"):
-    """
-    Create a list of objects from the type (cls) reading the values from
-    a fixed length file
-        :param cls: The class passed by the decorator
-        :param file_name: The name (and location) of the file to be
-            readed
-        :param encoding: The encoding to be used to read the file
-    """
+        """
+        Create a list of objects from the type (cls) reading the values from
+        a fixed length file
+            :param cls: The class passed by the decorator
+            :param file_name: The name (and location) of the file to be
+                readed
+            :param encoding: The encoding to be used to read the file
+        """
         entities = []
         fl_file = open(file_name, 'r', encoding=encoding)
         for nr_linha, row in enumerate(fl_file):
             if (re.match(fl_regex, row)):
                 try:
-                    # Check: https://stackoverflow.com/questions/21129020/how-to-fix-unicodedecodeerror-ascii-codec-cant-decode-byte
-                    # encoding='bytes'
-                    #~ print('gerando entidade da linha:' + str(nr_linha))
                     entity = cls()
                     entity.properties_from_fl(row)
                     entities.append(entity)
@@ -288,20 +309,20 @@ def data_entity(
         return entities
 
     def properties_from_fl(self, string=None):
-    """
-    Set the values of the properties from a fixed length string
-        :param self: The object which the values will be set
-        :param string: The string where the values will be readed
-    """
+        """
+        Set the values of the properties from a fixed length string
+            :param self: The object which the values will be set
+            :param string: The string where the values will be readed
+        """
         for p in self.__class__.fl_properties():
             # print( str( type ( p.fl_start )))
             tmp = string[p.fl_start: (p.fl_start + p.fl_length)].strip()
             setattr(self, p._name, tmp)
             
     def insert_sql_with_values(self):
-    """
-    Generate an sql string with the values, read to be inserted in the database
-    """
+        """
+        Generate an sql string with the values, read to be inserted in the database
+        """
 
         values = []
         for k, sql_columns_by_type in self.__class__.sql_columns().items():
@@ -315,10 +336,10 @@ def data_entity(
                 values).decode('utf-8'))
 
     def insert(self, commit=True):
-    """
-    Insert the values of the object (self) in the database, note that
-        :param commit: commit directly after executing the sql
-    """
+        """
+        Insert the values of the object (self) in the database, note that
+            :param commit: commit directly after executing the sql
+        """
         values = []
 
         for k, sql_columns_by_type in self.__class__.sql_columns().items():
@@ -332,22 +353,22 @@ def data_entity(
         return _id
 
     def get_data_sql_value(self, data_property=None):
-    """
-    Read the value of a sql column, if can't read the value, and there
-    is an default, the default is returned, None otherwise
-        :param data_property: Property to be readed
-    """
+        """
+        Read the value of a sql column, if can't read the value, and there
+        is an default, the default is returned, None otherwise
+            :param data_property: Property to be readed
+        """
         value = getattr(self, data_property._name,
                         getattr(data_property, 'default_value', None)
                         )
         return value
 
     def get_sql_definition(cls=None, cls_member=None):
-    """
-    Return the sql definition of a givern member of the class
-        :param cls: The class passed by the decorator
-        :param cls_member: The member which the sql should be generated
-    """
+        """
+        Return the sql definition of a givern member of the class
+            :param cls: The class passed by the decorator
+            :param cls_member: The member which the sql should be generated
+        """
 
         if(cls_member.sql_column_type
                 == Sql.ColumnType.AUTO_INCREMENT):
