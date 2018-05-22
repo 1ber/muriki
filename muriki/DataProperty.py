@@ -20,7 +20,7 @@ from gettext import gettext as _
 from aenum import Enum, skip
 from datetime import *
 
-import decimal
+import decimal 
 
 # TO be used as a constant
 
@@ -43,7 +43,7 @@ class Sql(Enum):
         bool = '{0} BOOLEAN'
         int = '{0} INTEGER'
         biginteger = '{0} BIGINT'
-        decimal = '{0} DECIMAL'
+        Decimal = '{0} DECIMAL'
         float = '{0} FLOAT'
         long = '{0} DOUBLE'
         date = '{0} DATE'
@@ -55,13 +55,14 @@ class Sql(Enum):
         primary_key = 'PRIMARY KEY'
         index = 'CREATE INDEX {0} ON '
         create_table = 'CREATE TABLE IF NOT EXISTS'
+        value_place_holder= '%s'
 
     @skip
     class Postgresql(Enum):
         bool = '{0} BOOLEAN'
         int = '{0} INTEGER'
         biginteger = '{0} BIGINT'
-        decimal = '{0} DECIMAL'
+        Decimal = '{0} DECIMAL'
         float = '{0} FLOAT'
         long = '{0} DOUBLE'
         date = '{0} DATE'
@@ -73,7 +74,28 @@ class Sql(Enum):
         primary_key = 'PRIMARY KEY ({0})'
         index = 'CREATE INDEX  IF NOT EXISTS {0}_idx ON {0}({1});'
         create_table = 'CREATE TABLE IF NOT EXISTS'
-        insert = """INSERT INTO {0}({1})VALUES({2}){3};"""
+        insert = """INSERT INTO {0}({1})VALUES({2});"""
+        value_place_holder= '%s'
+        
+    @skip
+    class Sqlite(Enum):
+        bool = '{0} BOOLEAN'
+        int = '{0} INTEGER'
+        biginteger = '{0} BIGINT'
+        Decimal = '{0} DECIMAL'
+        float = '{0} FLOAT'
+        long = '{0} DOUBLE'
+        date = '{0} DATE'
+        datetime = '{0} DATETIME'
+        time = '{0} TIME'
+        str = '{0} TEXT'
+        bigtext = '{0} LONGTEXT'
+        auto_increment = '{0} SERIAL'
+        primary_key = 'PRIMARY KEY ({0})'
+        index = 'CREATE INDEX  IF NOT EXISTS {0}_idx ON {0}({1});'
+        create_table = 'CREATE TABLE IF NOT EXISTS'
+        insert = """INSERT INTO {0}({1})VALUES({2});"""
+        value_place_holder= '?'
 
 
 DEFAULT_STR_LEN = 30
@@ -90,6 +112,7 @@ WhiteSpaceBehaviour = Enum('WhiteSpaceBehaviour', 'PRESERVE REPLACE COLLAPSE')
 class DataProperty(object):
     def __init__(self, *args, **kwargs):
         for k, v in kwargs.items():
+            #~ print( k, v )
             if (v is not None):
                 setattr(self, k, v)
 
@@ -291,14 +314,28 @@ class DataProperty(object):
                     return (datetime.strptime(value, self.input_format)
                             .date())
 
-                elif(self.data_type == decimal):
+                elif(self.data_type == decimal.Decimal):
                     # TODO need improvement for other input options besides fl
-                    tmp = (
-                        value[:self.fl_length - self.fraction_digits]
-                        + '.'
-                        + value[self.fl_length - self.fraction_digits:]
-                    )
-                    return decimal.Decimal(tmp)
+                    if( hasattr (self, 'fl_length') and hasattr( self, 'fraction_digits' ) ):
+                        tmp = (
+                            value[:self.fl_length - self.fraction_digits]
+                            + '.'
+                            + value[self.fl_length - self.fraction_digits:]
+                        )
+                    else:
+                        tmp = value
+                    try:
+                        return decimal.Decimal(tmp)
+                    except:
+                        if( hasattr( self, 'value_on_error' ) ):
+                            if self.value_on_error is None:
+                                return None
+                            else:
+                                return decimal.Decimal( self.value_on_error)
+                            pass
+                        else:
+                            raise
+                            
             # There is no specific convertion rules, so it just pass
             except AttributeError:
                 pass
@@ -315,15 +352,16 @@ class DataProperty(object):
 
                     raise ValueError(
                         generate_error_message(
-                            _("Can't convert {0} neither default "
-                                "value {1} to {2}"), value, self.value_on_error
+                            _("Can't convert {0} for {1} neither default "
+                                "value {2} to {3}"), value, self._name, self.value_on_error
                             , self.data_type
                             )
                     )
             else:
                 raise ValueError(
                     generate_error_message(
-                        _("Can't convert {0} to {1}"), value, self.data_type)
+                        _("Can't convert {0} to {1} in property {2}"), value, self.data_type
+                            , self._name)
                 )
 
     def process_white_spaces(self, value):
