@@ -50,11 +50,13 @@ class Sql(Enum):
         datetime = '{0} DATETIME'
         time = '{0} TIME'
         str = '{0} VARCHAR'
+        text = '{0} TEXT'
         bigtext = '{0} LONGTEXT'
         auto_increment = '{0} AUTO_INCREMENT'
-        primary_key = 'PRIMARY KEY'
-        index = 'CREATE INDEX {0} ON '
+        primary_key = 'PRIMARY KEY ({0})'
+        index = 'ALTER TABLE {0} ADD INDEX ({1});'
         create_table = 'CREATE TABLE IF NOT EXISTS'
+        insert = """INSERT INTO {0}({1})VALUES({2});"""
         value_place_holder= '%s'
 
     @skip
@@ -69,10 +71,11 @@ class Sql(Enum):
         datetime = '{0} DATETIME'
         time = '{0} TIME'
         str = '{0} VARCHAR'
+        text = '{0} TEXT'
         bigtext = '{0} LONGTEXT'
         auto_increment = '{0} SERIAL'
         primary_key = 'PRIMARY KEY ({0})'
-        index = 'CREATE INDEX  IF NOT EXISTS {0}_idx ON {0}({1});'
+        index = 'CREATE INDEX  IF NOT EXISTS {0}_idx_{1} ON {0}({1});'
         create_table = 'CREATE TABLE IF NOT EXISTS'
         insert = """INSERT INTO {0}({1})VALUES({2});"""
         value_place_holder= '%s'
@@ -89,6 +92,7 @@ class Sql(Enum):
         datetime = '{0} DATETIME'
         time = '{0} TIME'
         str = '{0} TEXT'
+        text = '{0} TEXT'
         bigtext = '{0} LONGTEXT'
         auto_increment = '{0} SERIAL'
         primary_key = 'PRIMARY KEY ({0})'
@@ -360,7 +364,7 @@ class DataProperty(object):
             else:
                 raise ValueError(
                     generate_error_message(
-                        _("Can't convert {0} to {1} in property {2}"), value, self.data_type
+                        _("Can't convert {0} value: '{1}' to {2} in property {2}"), str(self), value, self.data_type
                             , self._name)
                 )
 

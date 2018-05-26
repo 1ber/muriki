@@ -18,9 +18,11 @@
 
 import csv
 import re
+import sys
 from decimal import *
 from gettext import gettext as _
 from muriki.DataProperty import *
+import traceback
 #~ ( DataProperty, generate_error_message, data_property
                             #~ , auto_data_property, Sql)
 
@@ -45,7 +47,7 @@ def data_entity(
         database_password=None,
         database_name=None,
         database_port=None,
-        fl_regex=None):
+        ):
     """
     This class decorator is to be used to allow an class to be easily
     used to import data from files and persist this data
@@ -61,10 +63,6 @@ def data_entity(
         the user on the database
     :param database_port: TCP port of the database server to
         be used in the connection
-    :param fl_regex: Regex to be used to identify lines with
-        registers to be imported into instances of the
-        specified class
-
     """
 
 
@@ -79,20 +77,35 @@ def data_entity(
 
     
     @classmethod
-    def execute_sql(cls, sql=None, values=None, commit=True):
+    def execute_sql(cls, sql_statements=[], values=None, commit=True):
         """
         Execute arbitrary sql code, the code is generated in other functions
         based on the sqlEngine parameter
             :param cls: The class passed by the decorator
         """
         try:
-            if ( values is not None ):
-                result = cls._cursor.execute(sql, values)
-            else:
-                result = cls._cursor.execute(sql)
+            ## TODO, this is UGLY, need to separate in two functions, one to
+            ##       single and other to multiple statements
+            ##       also needs a better aproach for multiple value sets
+            ##       and native multiple execution 
+            if( type( sql_statements ) == str ):
+                tmp = sql_statements
+                sql_statements=list()
+                sql_statements.append( tmp )
+            
+            for sql_statement in sql_statements:
+                if ( values is not None ):
+                    result = cls._cursor.execute(sql_statement, values)
+                else:
+                    result = cls._cursor.execute(sql_statement )
+            
+            cls._connection.commit()
+
         except Exception as e:
+            #~ traceback.print_exc()
+            print ( str( e.args ) )
             raise Exception(
-                'Sql Error:' + sql+',values:'+str(values)+':'
+                'Sql Error:' + str(sql_statements)+',values:'+str(values)+':'
                 ) from e
             
             
@@ -101,9 +114,7 @@ def data_entity(
                     #~ cls._cursor .mogrify(sql, values).decode('utf-8'))
                 #~ ) from e
 
-        if commit:
-            cls._connection.commit()
-        return result
+        #~ return result
 
     @classmethod
     def sql_columns(cls):
@@ -143,6 +154,8 @@ def data_entity(
                    and not(p.fl_start is None))
                ]
         flp.sort(key=lambda f: f.fl_start)
+        
+        return flp
 
 
     @classmethod
@@ -170,11 +183,11 @@ def data_entity(
             :param cls: The class passed by the decorator
         """
 
+        sql_statements=[]
         tmp = cls._database_engine.create_table.value + \
             ' ' + (cls.__name__.lower() + ' ( ')
         
         aditional_primary_key = ''
-        aditional_index = ''
         
         ## The sql columns ared inserted in a specific order
         ## to improve performance
@@ -186,16 +199,11 @@ def data_entity(
             aditional_primary_key = aditional_primary_key + c._name + ', '
         for c in cls.sql_columns()[Sql.ColumnType.INDEX]:
             tmp = tmp + get_sql_definition(cls, c) + ', '
-            
-            aditional_index =   (
-                                    aditional_index 
-                                    + ( 
-                                        cls._database_engine.index
-                                            .value.format(
-                                                cls.__name__
-                                                , c._name)
-                                            )
-                                )
+            sql_statements.append( 
+                cls._database_engine.index.value.format(
+                cls.__name__.lower(),c._name.lower())
+            )
+                                
         for c in cls.sql_columns()[Sql.ColumnType.SIMPLE]:
             tmp = tmp + get_sql_definition(cls, c) + ', '
             
@@ -209,11 +217,12 @@ def data_entity(
                    .format(aditional_primary_key))
                   if aditional_primary_key
                   else '')
-               + ');'
-               + aditional_index)
+               + ');')
         #clean the unused extra commas
         tmp = re.sub(',\s*\)', ' )', tmp)
-        return tmp
+        
+        sql_statements.insert( 0, tmp )
+        return sql_statements
 
     @classmethod
     def insert_sql(cls):
@@ -292,19 +301,17 @@ def data_entity(
                                     , delimiter=delimiter
                                     , quotechar=quotechar
                                 )
-        if ( not headers is None ):
+        if ( headers ):
             next( csv_reader, None )
         for row_number, row in enumerate( csv_reader ):
-            try:
-                entity = cls()
-                entity.properties_from_csv( row )
-                entities.append( entity )
-            except Exception as e:
-                raise Exception(
-                    'Error creating entities from csv file, line:' 
-                        + str( row_number )
-                        +':'+ str(row)+':'
-                    ) from e
+            entity = cls()
+            entity.properties_from_csv( row )
+            entities.append( entity )
+                #~ raise Exception(
+                    #~ 'Error creating entities from csv file, line:' 
+                        #~ + str( row_number )
+                        #~ +':'+ str(row)+':'
+                    #~ ) from e
         return ( entities )
 
     def properties_from_csv(self, values=None):
@@ -313,12 +320,23 @@ def data_entity(
             :param cls: The class passed by the decorator
             :param values: The list of values to be setted in the properties
         """
-        
-        for p in self.__class__.csv_properties():
-            setattr(self, p._name, values[ p.csv_position] )
+        try:
+            for p in self.__class__.csv_properties():
+                setattr(self, p._name, values[ p.csv_position] )
+        except Exception as e:
+            raise Exception(
+                    'Error reading property: '
+                    +'class properties length:' 
+                    + str( len( self.__class__.csv_properties() ) ) 
+                    + ', values length:' + str( len( values ) )
+                    + ', property: '+str( p ) 
+                    + ' from values: ' 
+                    + str( values )
+                ) from e
             
     @classmethod
-    def create_from_fl(cls, file_name=None, encoding="utf-8"):
+    def create_from_fl(cls, file_name=None, encoding="utf-8" 
+        , fl_line_length=None , fl_regex=None ):
         """
         Create a list of objects from the type (cls) reading the values from
         a fixed length file
@@ -326,18 +344,32 @@ def data_entity(
             :param file_name: The name (and location) of the file to be
                 readed
             :param encoding: The encoding to be used to read the file
+            :param fl_line_length: Chunk size to be readed and converted
+                to a line in files with no line neds
+           :param fl_regex: Regex to be used to identify lines with
+                registers to be imported into instances of the
+                specified class
+        
         """
-        entities = []
-        fl_file = open(file_name, 'r', encoding=encoding)
-        for nr_linha, row in enumerate(fl_file):
-            if (re.match(fl_regex, row)):
-                try:
-                    entity = cls()
-                    entity.properties_from_fl(row)
-                    entities.append(entity)
-                except BaseException:
-                    traceback.print_exc()
-                    pass
+        
+        
+        data_lines = []
+        if ( fl_line_length is not None ):
+            with open(file_name, "rb") as f:
+                for chunk in iter(lambda: f.read( fl_line_length ), b""):
+                    data_lines.append( chunk.decode( encoding ) )
+        else:
+            fl_file = open(file_name, 'r', encoding=encoding)
+            for row in enumerate(fl_file):
+                data_lines.append( row )
+
+        entities=[]
+        for line_number, line in enumerate( data_lines ):
+            if ( fl_regex is None or re.match( fl_regex, line)  ):
+                entity = cls()
+                entity.properties_from_fl( line )
+                entities.append(entity)
+
         return entities
 
     def properties_from_fl(self, string=None):
@@ -349,6 +381,8 @@ def data_entity(
         for p in self.__class__.fl_properties():
             tmp = string[p.fl_start: (p.fl_start + p.fl_length)].strip()
             setattr(self, p._name, tmp)
+
+
             
     def insert_sql_with_values(self):
         """
@@ -414,7 +448,7 @@ def data_entity(
             :param cls: The class passed by the decorator
             :param cls_member: The member which the sql should be generated
         """
-
+        length=None
         if(cls_member.sql_column_type
                 == Sql.ColumnType.AUTO_INCREMENT):
             return (cls._database_engine.auto_increment.value
@@ -424,14 +458,31 @@ def data_entity(
             sql_data_type = (cls._database_engine[
                 python_data_type.__name__].value)
             if(python_data_type == str):
-                length = getattr(cls_member, 'max_length',
-                                 getattr(cls_member, 'length', 0)
-                                 )
+                length = (
+                    getattr(cls_member, 'max_length',
+                        getattr(cls_member, 'length', 
+                            getattr(cls_member, 'fl_length',
+                                0 )
+                        )
+                    )
+                )
+                
                 if(length >= BIG_TEXT_MIN_LEN):
                     sql_data_type = (cls._database_engine.bigtext.value)
-                elif(length > 0):
-                    sql_data_type = (sql_data_type + '('
-                                     + str(length) + ')')
+                elif( length > 0 ):
+                    sql_data_type = ( 
+                        cls._database_engine.str.value
+                        + '('+str( length ) + ')'
+                    )
+                else:
+                    sql_data_type = (  cls._database_engine.text.value )
+
+                
+                    
+                    
+                #~ elif(length > 0):
+                    #~ sql_data_type = (sql_data_type + '('
+                                     #~ + str(length) + ')')
                                      
             elif(python_data_type == int):
                 max_value = getattr(cls_member, 'max_exclusive',
@@ -456,7 +507,12 @@ def data_entity(
                 sql_data_type = (
                     sql_data_type + '(' + str(total_digits) + ', '
                     + str(fraction_digits) + ')')
-            return sql_data_type.format(cls_member._name)
+            
+            if( length is not None ):
+                return sql_data_type.format(cls_member._name , length )
+            else:
+                return sql_data_type.format(cls_member._name )
+
 
     if (cls is None):
     ## This is the chunck that really decorates the class, inserting the
@@ -480,11 +536,21 @@ def data_entity(
             cls.create_from_csv = create_from_csv
             cls.properties_from_csv=properties_from_csv
             cls.csv_properties = csv_properties
-
-            cls.fl_regex = fl_regex
+            
 
             if not(database_name is None):
                 if( cls._database_engine == Sql.Mysql ):
+                    import mysql.connector
+                    cls._connection = mysql.connector.connect(
+                        database=database_name,
+                        user=database_user,
+                        password=database_password,
+                        host=database_server_address,
+                        port=database_port)
+                    cls._cursor = cls._connection.cursor()
+                    
+                    
+                    
                     # TODO - Connect to the mysql database
                     pass
                 elif( cls._database_engine == Sql.Postgresql ):
