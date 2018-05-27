@@ -27,7 +27,8 @@ setup(
     author='Humberto Ramos Costa',
     author_email='1bertorc@gmail.com',
     url = 'https://github.com/1ber/muriki',
-    download_url = 'https://github.com/1ber/muriki/archive/0.1.tar.gz',
+    download_url = 'https://github.com/1ber/muriki/',
     keywords = ['muriki', 'import', 'csv', 'fixed length', 'database'],
     classifiers = [],
+    data_files = [("", ["LICENSE"])]
 )
