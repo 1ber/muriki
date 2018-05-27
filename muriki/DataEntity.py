@@ -394,8 +394,8 @@ def data_entity(
         for k, sql_columns_by_type in self.__class__.sql_columns().items():
             for sql_column in sql_columns_by_type:
                 if(sql_column.data_type != auto_increment):
-                    values.append(self.get_data_sql_value(sql_column))
-
+                    values.append(self.get_property_value(sql_column))
+        ## TODO - Only for Postgre, needs rewriting for other DBs
         return (
             self.__class__._cursor.mogrify(
                 self.__class__.insert_sql(),
@@ -414,14 +414,14 @@ def data_entity(
                         sql_column.sql_column_type
                         !=Sql.ColumnType.AUTO_INCREMENT
                     ):
-                    values.append(self.get_data_sql_value(sql_column))
+                    values.append(self.get_property_value(sql_column))
 
         _id = self.__class__.execute_sql(
             self.__class__.insert_sql(), values, commit)
 
         return _id
 
-    def get_data_sql_value(self, data_property=None):
+    def get_property_value(self, data_property=None):
         """
         Read the value of a sql column, if can't read the value, and there
         is an default, the default is returned, None otherwise
@@ -512,6 +512,52 @@ def data_entity(
                 return sql_data_type.format(cls_member._name , length )
             else:
                 return sql_data_type.format(cls_member._name )
+    @classmethod
+    def fl_properties_names( cls ):
+        fl_p_names=list()
+        for fl_p in cls.fl_properties():
+            fl_p_names.append( fl_p._name )
+        return fl_p_names
+        
+    def values( self ):
+        p_values=list()
+        for prop in self.__class__.fl_properties():
+            p_values.append( self.get_property_value( prop) )
+        return p_values
+        
+    
+
+                
+                
+    @classmethod
+    def write_csv_file(
+            cls,
+            file_name=None,
+            headers=True,
+            delimiter='\t',
+            quotechar='"',
+            instances=list() ):
+        """
+        Write a series of instances of the decorated class into a
+        csv file
+        """
+        with open( file_name, 'w', ) as csv_file:
+            csv_writer = csv.writer( 
+                csv_file, 
+                delimiter=delimiter, 
+                quotechar=quotechar, 
+                quoting=csv.QUOTE_MINIMAL
+            )
+            
+            if( headers ):
+                header_names=list()
+                for csv_prop in cls.csv_properties():
+                    header_names.append( csv_prop._name )
+                csv_writer.writerow( header_names )
+                
+            for instance in instances:
+                csv_writer.writerow( instance.values() )
+
 
 
     if (cls is None):
@@ -519,18 +565,13 @@ def data_entity(
     ## various methods defined above
 
         def wrapper(cls):
-        """
-        This is the chunck that really decorates the class, inserting
-        the methods defined above and the given parameters
-        """
-
             cls._database_engine = database_engine
             cls.sql_columns = sql_columns
             cls.create_table_sql = create_table_sql
             cls.create_table = create_table
             cls.execute_sql = execute_sql
             cls.insert = insert
-            cls.get_data_sql_value = get_data_sql_value
+            cls.get_property_value = get_property_value
             cls.insert_sql = insert_sql
             cls.batch_insert = batch_insert
             cls.insert_sql_with_values = insert_sql_with_values
@@ -541,7 +582,9 @@ def data_entity(
             cls.create_from_csv = create_from_csv
             cls.properties_from_csv=properties_from_csv
             cls.csv_properties = csv_properties
-            
+            cls.fl_properties_names=fl_properties_names
+            cls.values = values
+            cls.write_csv_file=write_csv_file
 
             if not(database_name is None):
                 if( cls._database_engine == Sql.Mysql ):
