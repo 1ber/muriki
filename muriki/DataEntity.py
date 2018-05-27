@@ -360,7 +360,7 @@ def data_entity(
                     data_lines.append( chunk.decode( encoding ) )
         else:
             fl_file = open(file_name, 'r', encoding=encoding)
-            for row in enumerate(fl_file):
+            for row in fl_file:
                 data_lines.append( row )
 
         entities=[]
