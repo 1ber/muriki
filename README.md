@@ -6,5 +6,5 @@ and persist to databases.
 
 pip install muriki
 
-Check muriki_test1.py for an use example
+Check tutorial directory for use examples
 
