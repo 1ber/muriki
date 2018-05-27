@@ -328,18 +328,7 @@ class DataProperty(object):
                         )
                     else:
                         tmp = value
-                    try:
-                        return decimal.Decimal(tmp)
-                    except:
-                        if( hasattr( self, 'value_on_error' ) ):
-                            if self.value_on_error is None:
-                                return None
-                            else:
-                                return decimal.Decimal( self.value_on_error)
-                            pass
-                        else:
-                            raise
-                            
+                    return decimal.Decimal(tmp)
             # There is no specific convertion rules, so it just pass
             except AttributeError:
                 pass
@@ -348,26 +337,32 @@ class DataProperty(object):
                 return(self.data_type(value))
             else:
                 return value
-        except BaseException:
-            if(hasattr(self, 'value_on_error')):
+        except Exception:
+            if( hasattr(self.__class__, 'value_on_error') ):
                 try:
                     return(self.data_type(self.value_on_error))
-                except BaseException:
-
-                    raise ValueError(
+                except Exception as e :
+                    raise Exception(
                         generate_error_message(
-                            _("Can't convert {0} for {1} neither default "
-                                "value {2} to {3}"), value, self._name, self.value_on_error
-                            , self.data_type
+                            _("Can't convert value {0} neither "
+                                "value_on_error  {1} to {2} data type"
+                                "in {3}"),
+                                value,
+                                self.value_on_error,
+                                self.data_type, 
+                                str( self )
                             )
-                    )
-            else:
-                raise ValueError(
+                    ) from e
+                except Exception as e :
+                    raise Exception(
                     generate_error_message(
-                        _("Can't convert {0} value: '{1}' to {2} in property {2}"), str(self), value, self.data_type
-                            , self._name)
-                )
-
+                        _("Can't convert value {0} to {1} data type"
+                            " in {2}"),
+                            value,
+                            self.data_type, 
+                            str( self )
+                        )
+                ) from e
     def process_white_spaces(self, value):
         if(isinstance(value, str)):
             if(self.white_space_behaviour
