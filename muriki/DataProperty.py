@@ -32,10 +32,10 @@ class auto_increment(object):
 class Sql(Enum):
     @skip
     class ColumnType(Enum):
-        AUTO_INCREMENT = 0
-        PRIMARY_KEY = 1
-        INDEX = 2
-        SIMPLE = 3
+        AUTO_INCREMENT = 0      #An self increment index column
+        PRIMARY_KEY = 1         #Non repeting data, used to index table
+        INDEX = 2               #Secondary index, can repeat
+        SIMPLE = 3              #Common data
 #        NO = 4
 
     @skip
@@ -412,6 +412,51 @@ def data_property(
         fl_length=None,
         input_format=None,
         csv_position=None):
+            
+    """
+    This is the decorator that insert the functions and parameters
+    to the given data column.
+
+    :param fget: The getter function
+    :param length: The only valid length of the column/field data
+    :param min_length:  The minimum valid length  of the 
+                        column/field data
+    :param max_length: The maximum valid length of the column/field data
+    :param valid_values:    A list of accpted values of the column/field
+                            data
+    :param pattern: A regex that define which values are valid 
+                    for the column/field data
+    :param max_exclusive:   max valid value for the column/field data
+                            except ifself
+    :param max_inclusive: max valid value for the column/field data
+    :param min_exclusive:   mininum valid value for the column/field 
+                            data except ifself
+    :param min_inclusive:    mininum valid value for the column/field
+    :param data_type: the python data type of he column/field
+    :param value_on_error:  a value to be used when there is an 
+                            conversion error, None is not valid
+    :param white_space_behaviour:   What to tod with the trailing white
+                                    spaces before convert the data
+    :param sql_column_type: one of the following:
+        Sql.ColumnType.AUTO_INCREMENT An self increment index column
+        Sql.ColumnType.PRIMARY_KEY  Non repeting data, used to 
+                                    index table
+        Sql.ColumnType.INDEX Secondary index, can repeat
+        Sql.ColumnType.SIMPLECommon data
+    :param allow_none: Define if None is considere a valid value
+    :param total_digits: Total digits for a Decimal data type
+    :param fraction_digits: Fraction digits for a Decimal data type
+    :param default_value: Value set by default
+    :param fl_start:    The beginning position (zero based ) when 
+                        reading from an fixed length line
+    :param fl_length:   The total length of the field in a fixed length
+                        line (include all digits for decimals)
+    :param input_format: Data used to convert data (specially for dates)
+    :param csv_position:    Position of the field in an csv line 
+                            (zero based)
+    """
+
+
     if(fget is None):
         def wrapper(fget):
             return DataProperty(
@@ -465,6 +510,12 @@ def auto_data_property(
         fl_length=None,
         input_format=None,
         csv_position=None):
+        
+    """
+    This is the simplified version, where the setter and getter are
+    createad automatically
+    """
+    
     if(place_holder_function is None):
         def wrapper(place_holder_function):
             return DataProperty(

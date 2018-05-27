@@ -519,6 +519,11 @@ def data_entity(
     ## various methods defined above
 
         def wrapper(cls):
+        """
+        This is the chunck that really decorates the class, inserting
+        the methods defined above and the given parameters
+        """
+
             cls._database_engine = database_engine
             cls.sql_columns = sql_columns
             cls.create_table_sql = create_table_sql
